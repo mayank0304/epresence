@@ -3,97 +3,137 @@
 #include <MFRC522.h>
 #include <SPI.h>
 
-#define RST_PIN 5         // Reset pin
-#define SS_PIN 4          // SDA pin (also called SS)
-#define LED_NEGATIVE 13   // Connect an LED for negative response
-#define LED_POSITIVE 12    // Connect an LED for positive response
+// Pin definitions
+#define RST_PIN 5      // Reset pin
+#define SS_PIN 4       // SDA pin (also called SS)
+#define LED_RED 12     // Red pin of RGB LED
+#define LED_GREEN 13   // Green pin of RGB LED
+#define LED_BLUE 14    // Blue pin of RGB LED
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 
-const char *ssid = "POCO M3";
-const char *password = "mhrmmtmpd#0##";
-const char *serverUrl = "http://192.168.179.249:5000/log-rfid";
-WiFiClient client;
+// Network configuration
+const char *ssid = "Sharma."; // WIFI SSID
+const char *password = "sharma97531"; // WIFI Password
+const char *serverUrl = "https://epresence-server.shuttleapp.rs/scan";
+const int group_id = 1; // Group ID to assiciate with the ESP32
 
-String lastUid = "";  // Store last scanned UID to avoid duplicate logging
+// Session state
+bool isSessionActive = false;
+
+// LED control function
+void setLEDColor(int redState, int greenState, int blueState) {
+    // Remember: LOW is ON, HIGH is OFF for the LED
+    digitalWrite(LED_RED, redState);
+    digitalWrite(LED_GREEN, greenState);
+    digitalWrite(LED_BLUE, blueState);
+}
+
+void turnOffLEDs() {
+    setLEDColor(HIGH, HIGH, HIGH);
+}
+
+void blinkLED(int redState, int greenState, int blueState, int duration) {
+    setLEDColor(redState, greenState, blueState);
+    delay(duration);
+    turnOffLEDs();
+}
 
 void setup() {
-  Serial.begin(115200);
-  SPI.begin(18, 19, 23, 21);  // SCK, MISO, MOSI, SS
-  mfrc522.PCD_Init();
+    Serial.begin(115200);
+    
+    // Initialize SPI bus
+    SPI.begin(18, 19, 23, 21); // SCK, MISO, MOSI, SS
+    mfrc522.PCD_Init();
 
-  // Initialize LED pins
-  pinMode(LED_NEGATIVE, OUTPUT);
-  pinMode(LED_POSITIVE, OUTPUT);
-  digitalWrite(LED_NEGATIVE, HIGH);
-  digitalWrite(LED_POSITIVE, HIGH);
+    // Setup LED pins
+    pinMode(LED_RED, OUTPUT);
+    pinMode(LED_GREEN, OUTPUT);
+    pinMode(LED_BLUE, OUTPUT);
+    turnOffLEDs();
 
-  // Connect to Wi-Fi
-  Serial.println("Connecting to WiFi...");
-  WiFi.begin(ssid, password);
-  
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(800);
-    Serial.println("Connecting...");
-  }
-  Serial.println("Connected to WiFi");
+    // Connect to WiFi
+    Serial.println("Connecting to WiFi...");
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(800);
+        Serial.println("Connecting...");
+        blinkLED(LOW, HIGH, HIGH, 200); // Blink red during connection
+    }
+    
+    Serial.println("Connected to WiFi");
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
+}
 
-  // Print the ESP32's IP address
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
+void handleServerResponse(int httpCode, String response) {
+    if (httpCode == 201) {  // New session started
+        Serial.println("Admin session started");
+        isSessionActive = true;
+        blinkLED(HIGH, LOW, HIGH, 2000);  // Green flash
+    }
+    else if (httpCode == 200) {
+        if (response.indexOf("session ended") != -1) {  // Session ended
+            Serial.println("Session ended");
+            isSessionActive = false;
+            blinkLED(HIGH, LOW, HIGH, 2000);  // Green flash
+        }
+        else {  // Attendance marked
+            Serial.println("Attendance marked");
+            blinkLED(HIGH, LOW, HIGH, 1000);  // Green flash
+        }
+    }
+    else {  // Error
+        Serial.println("Error: " + response);
+        blinkLED(LOW, HIGH, HIGH, 1000);  // Red flash
+    }
 }
 
 void loop() {
-  if (!mfrc522.PICC_IsNewCardPresent()) {
-    return;
-  }
+    // Show session state with blue LED
+    if (isSessionActive) {
+        digitalWrite(LED_BLUE, LOW);  // Blue ON during active session
+    } else {
+        digitalWrite(LED_BLUE, HIGH); // Blue OFF when no session
+    }
 
-  if (!mfrc522.PICC_ReadCardSerial()) {
-    return;
-  }
+    // Check for new card
+    if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial()) {
+        return;
+    }
 
-  // Read and format UID
-  String uid = "";
-  for (byte i = 0; i < mfrc522.uid.size; i++) {
-    uid += String(mfrc522.uid.uidByte[i], HEX);
-  }
+    // Turn off all LEDs before processing card
+    turnOffLEDs();
 
-  // Check if this UID has already been scanned
-  if (uid == lastUid) {
-    Serial.println("Card already scanned, ignoring...");
-    digitalWrite(LED_NEGATIVE, LOW);
-    delay(700);  // Keep LED on for a moment to indicate successful scan
-    digitalWrite(LED_NEGATIVE, HIGH);
-    return;
-  }
+    // Convert UID to string
+    String uid = "";
+    for (byte i = 0; i < mfrc522.uid.size; i++) {
+        if (mfrc522.uid.uidByte[i] < 0x10) {
+            uid += "0";  // Add leading zero for single-digit hex values
+        }
+        uid += String(mfrc522.uid.uidByte[i], HEX);
+    }
 
-  // Log UID to Flask server
-  HTTPClient http;
-  http.begin(serverUrl);
-  http.addHeader("Content-Type", "application/json");
+    // Send request to server
+    HTTPClient http;
+    http.begin(serverUrl);
+    http.addHeader("Content-Type", "application/json");
+    String payload = "{\"rfid\": \"" + uid + "\", \"group_id\": " + String(group_id) + "}";
+    
+    int httpCode = http.POST(payload);
+    if (httpCode > 0) {
+        String response = http.getString();
+        handleServerResponse(httpCode, response);
+    } else {
+        Serial.println("Failed to send HTTP request");
+        blinkLED(LOW, HIGH, HIGH, 1000);  // Red flash for error
+    }
+    
+    http.end();
+    delay(1000);
 
-  String payload = "{\"uid\": \"" + uid + "\"}";  // Create JSON payload
-
-  int httpCode = http.POST(payload);  // Send POST request
-  if (httpCode > 0) {
-    Serial.println("UID logged successfully");
-
-    // Turn on positive LED
-    digitalWrite(LED_POSITIVE, LOW);
-    delay(700);  // Keep LED on for a moment to indicate successful scan
-    digitalWrite(LED_POSITIVE, HIGH);
-
-    // Update last scanned UID
-    lastUid = uid;
-  } else {
-    Serial.println("Failed to log UID");
-
-    // Turn on negative LED as an error indicator
-    digitalWrite(LED_NEGATIVE, LOW);
-    delay(700);  // Keep LED on for a moment
-    digitalWrite(LED_NEGATIVE, HIGH);
-  }
-
-  http.end();
-  delay(1000);  // Delay before scanning the next card
+    // Restore session state LED after processing
+    if (isSessionActive) {
+        digitalWrite(LED_BLUE, LOW);
+    }
 }
