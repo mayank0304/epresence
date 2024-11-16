@@ -11,8 +11,7 @@ async fn main(#[shuttle_shared_db::Postgres] pool: PgPool) -> shuttle_axum::Shut
         .run(&pool)
         .await
         .map_err(CustomError::new)?;
-    let state = appstate::AppState { pool };
-    let router = routes::router(state);
+    let router = routes::router(pool);
 
     Ok(router.into())
 }

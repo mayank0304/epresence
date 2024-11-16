@@ -2,7 +2,7 @@ use axum::{extract::State, http::StatusCode, Json};
 
 use crate::{
     appstate::AppState,
-    models::{Admin, Attendance, Group, Session, User},
+    models::{Admin, Attendance, Session, User},
 };
 
 #[derive(serde::Deserialize)]
@@ -12,7 +12,7 @@ pub struct ScanRequest {
 }
 
 pub async fn scan(
-    State(AppState { pool }): State<AppState>,
+    State(AppState { pool, .. }): State<AppState>,
     Json(data): Json<ScanRequest>,
 ) -> Result<(StatusCode, String), (StatusCode, String)> {
     // Log attempt to scan
@@ -55,9 +55,9 @@ pub async fn scan(
 
         // Create a new session with the admin's ID as the creator for the given group
         sqlx::query("INSERT INTO sessions (start_time, created_by, group_id) VALUES ($1, $2, $3)")
-            .bind(chrono::Utc::now().naive_utc()) // Using current time as start_time
-            .bind(admin.id) // Getting the admin's ID from the result row
-            .bind(data.group_id) // Use group_id from the request
+            .bind(chrono::Utc::now().naive_utc())
+            .bind(admin.id)
+            .bind(data.group_id)
             .execute(&pool)
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;

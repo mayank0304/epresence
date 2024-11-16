@@ -10,8 +10,8 @@
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 
-const char *ssid = "Airtel_maya_1903";
-const char *password = "Air@28270";
+const char *ssid = "POCO M3";
+const char *password = "mhrmmtmpd#0##";
 const char *serverUrl = "http://192.168.179.249:5000/log-rfid";
 WiFiClient client;
 
