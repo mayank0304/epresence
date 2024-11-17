@@ -190,40 +190,27 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         user_id: ID,
-        group_id: ID,
+        session_id: ID,
     ) -> async_graphql::Result<Attendance> {
         let pool = ctx.data::<PgPool>()?;
-        let session = sqlx::query_as::<_, Session>("SELECT * FROM sessions WHERE group_id = $1")
-            .bind(group_id.parse::<i32>()?)
-            .fetch_optional(pool)
-            .await?;
-        // Check if session is found
-        if session.is_none() {
-            return Err("No active session found for the specified group.".into());
-        }
-        let session = session.unwrap();
-
-        // Check if user has already marked attendance
-        let attendance = sqlx::query_as::<_, Session>(
+        // Check if attendance has already been marked
+        let attendance = sqlx::query_as::<_, Attendance>(
             "SELECT * FROM attendance WHERE user_id = $1 AND session_id = $2",
         )
         .bind(user_id.parse::<i32>()?)
-        .bind(session.id)
+        .bind(session_id.parse::<i32>()?)
         .fetch_optional(pool)
         .await?;
         if attendance.is_some() {
-            return Err("User has already marked attendance for this session.".into());
+            return Err("Attendance has already been marked.".into());
         }
-
-        // Attempt to mark attendance
-        let attendance = sqlx::query_as(
+        let attendance = sqlx::query_as::<_, Attendance>(
             "INSERT INTO attendance (user_id, session_id) VALUES ($1, $2) RETURNING *",
         )
         .bind(user_id.parse::<i32>()?)
-        .bind(session.id)
+        .bind(session_id.parse::<i32>()?)
         .fetch_one(pool)
         .await?;
-
         Ok(attendance)
     }
 
@@ -232,15 +219,15 @@ impl MutationRoot {
         ctx: &Context<'_>,
         user_id: ID,
         session_id: ID,
-    ) -> async_graphql::Result<Session> {
+    ) -> async_graphql::Result<Attendance> {
         let pool = ctx.data::<PgPool>()?;
-        let session = sqlx::query_as::<_, Session>(
+        let attendance = sqlx::query_as::<_, Attendance>(
             "DELETE FROM attendance WHERE user_id = $1 AND session_id = $2 RETURNING *",
         )
         .bind(user_id.parse::<i32>()?)
         .bind(session_id.parse::<i32>()?)
         .fetch_one(pool)
         .await?;
-        Ok(session)
+        Ok(attendance)
     }
 }
