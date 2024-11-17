@@ -18,6 +18,7 @@ pub struct Admin {
     #[graphql(skip)]
     pub id: i32,
     pub username: String,
+    #[graphql(skip)]
     pub password: String,
     pub rfid: String,
     pub created_at: chrono::NaiveDateTime,
@@ -82,4 +83,4 @@ macro_rules! impl_graphql_id {
     };
 }
 
-impl_graphql_id!(User, Admin, Session, Attendance, RfidLog);
+impl_graphql_id!(User, Admin, Attendance, RfidLog);

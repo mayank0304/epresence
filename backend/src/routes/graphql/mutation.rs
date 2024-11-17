@@ -55,6 +55,18 @@ impl MutationRoot {
         created_by: ID,
     ) -> async_graphql::Result<Session> {
         let pool = ctx.data::<PgPool>()?;
+
+        // Check if a session is already active for the group
+        let session = sqlx::query_as::<_, Session>(
+            "SELECT * FROM sessions WHERE group_id = $1 AND end_time IS NULL",
+        )
+        .bind(group_id.parse::<i32>()?)
+        .fetch_optional(pool)
+        .await?;
+        if session.is_some() {
+            return Err("An active session already exists for the specified group.".into());
+        }
+
         let session = sqlx::query_as::<_, Session>(
             "INSERT INTO sessions (group_id, created_by) VALUES ($1, $2) RETURNING *",
         )

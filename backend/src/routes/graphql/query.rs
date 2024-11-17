@@ -1,7 +1,7 @@
 use async_graphql::{ComplexObject, Context, Object, ID};
 use sqlx::PgPool;
 
-use crate::models::{Attendance, Group, RfidLog, Session, User};
+use crate::models::{Admin, Attendance, Group, RfidLog, Session, User};
 
 pub struct QueryRoot;
 
@@ -22,6 +22,30 @@ impl Group {
         .fetch_all(pool)
         .await?;
         Ok(users)
+    }
+}
+
+// implement group and createdByAdmin resolvers for Session model
+#[ComplexObject]
+impl Session {
+    async fn id(&self) -> ID {
+        self.id.to_string().into()
+    }
+    async fn group(&self, ctx: &Context<'_>) -> async_graphql::Result<Option<Group>> {
+        let pool = ctx.data::<PgPool>()?;
+        let group = sqlx::query_as::<_, Group>("SELECT * FROM groups WHERE id = $1")
+            .bind(self.group_id)
+            .fetch_optional(pool)
+            .await?;
+        Ok(group)
+    }
+    async fn created_by_admin(&self, ctx: &Context<'_>) -> async_graphql::Result<Admin> {
+        let pool = ctx.data::<PgPool>()?;
+        let user = sqlx::query_as::<_, Admin>("SELECT * FROM admins WHERE id = $1")
+            .bind(self.created_by)
+            .fetch_one(pool)
+            .await?;
+        Ok(user)
     }
 }
 
