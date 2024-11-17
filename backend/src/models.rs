@@ -1,4 +1,4 @@
-use async_graphql::{ComplexObject, SimpleObject, ID};
+use async_graphql::{SimpleObject, ID};
 use sqlx::prelude::FromRow;
 
 #[derive(FromRow, SimpleObject)]
