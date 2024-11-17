@@ -82,4 +82,4 @@ macro_rules! impl_graphql_id {
     };
 }
 
-impl_graphql_id!(User, Admin, Group, Session, Attendance, RfidLog);
+impl_graphql_id!(User, Admin, Session, Attendance, RfidLog);

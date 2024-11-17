@@ -1,9 +1,29 @@
-use async_graphql::{Context, Object, ID};
+use async_graphql::{ComplexObject, Context, Object, ID};
 use sqlx::PgPool;
 
 use crate::models::{Attendance, Group, RfidLog, Session, User};
 
 pub struct QueryRoot;
+
+// implement users resolver for Group model
+#[ComplexObject]
+impl Group {
+    async fn id(&self) -> ID {
+        self.id.to_string().into()
+    }
+    async fn users(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<User>> {
+        let pool = ctx.data::<PgPool>()?;
+        let users = sqlx::query_as::<_, User>(
+            "SELECT users.* FROM users
+            INNER JOIN user_groups ON users.id = user_groups.user_id
+            WHERE user_groups.group_id = $1",
+        )
+        .bind(self.id)
+        .fetch_all(pool)
+        .await?;
+        Ok(users)
+    }
+}
 
 #[Object]
 impl QueryRoot {
