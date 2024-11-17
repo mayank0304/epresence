@@ -11,6 +11,11 @@ async fn main(#[shuttle_shared_db::Postgres] pool: PgPool) -> shuttle_axum::Shut
         .run(&pool)
         .await
         .map_err(CustomError::new)?;
+    // Set Postgres timezone to Asia/Kolkata
+    sqlx::query("SET TIME ZONE 'Asia/Kolkata'")
+        .execute(&pool)
+        .await
+        .map_err(CustomError::new)?;
     let router = routes::router(pool);
 
     Ok(router.into())
