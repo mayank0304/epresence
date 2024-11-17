@@ -1,4 +1,4 @@
-use async_graphql::{SimpleObject, ID};
+use async_graphql::SimpleObject;
 use sqlx::prelude::FromRow;
 
 #[derive(FromRow, SimpleObject)]
@@ -18,8 +18,6 @@ pub struct Admin {
     #[graphql(skip)]
     pub id: i32,
     pub username: String,
-    #[graphql(skip)]
-    pub password: String,
     pub rfid: String,
     pub created_at: chrono::NaiveDateTime,
     pub updated_at: chrono::NaiveDateTime,
@@ -69,18 +67,3 @@ pub struct RfidLog {
     pub created_at: chrono::NaiveDateTime,
     pub updated_at: chrono::NaiveDateTime,
 }
-
-macro_rules! impl_graphql_id {
-    ($($t:ty),*) => {
-        $(
-            #[async_graphql::ComplexObject]
-            impl $t {
-                async fn id(&self) -> ID {
-                    self.id.to_string().into()
-                }
-            }
-        )*
-    };
-}
-
-impl_graphql_id!(User, Admin, Attendance, RfidLog);

@@ -12,6 +12,7 @@ use crate::appstate::AppState;
 
 pub mod mutation;
 pub mod query;
+mod resolvers;
 
 pub type GQLSchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
 
