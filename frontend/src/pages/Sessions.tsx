@@ -82,7 +82,7 @@ const Sessions = () => {
     }
   `;
 
-  const [selectedGroupFilter, setSelectedGroupFilter] = useState<string>("");
+  const [selectedGroupFilter] = useState<string>("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newSessionGroup, setNewSessionGroup] = useState<string>("");
 
@@ -159,28 +159,7 @@ const Sessions = () => {
 
   return (
     <div className="w-full p-2 md:p-4 lg:p-8 flex flex-col gap-4">
-      <div className="flex justify-between items-center">
-        <div className="flex gap-4">
-          {groupsLoading && (
-            <Select
-              value={selectedGroupFilter}
-              onValueChange={setSelectedGroupFilter}
-            >
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filter by Group" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Groups</SelectItem>
-                {groupsData?.groups?.map((group: any) => (
-                  <SelectItem key={group.id} value={group.id}>
-                    {group.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-
+      <div className="flex justify-end items-center">
         <Button onClick={() => setIsCreateModalOpen(true)}>
           <Plus className="h-4 w-4 mr-1" />
           New Session
